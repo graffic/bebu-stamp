@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# enter timestamps into a file
+STAMPFILE=~/.workstamps.txt
+
+datetime=`date "+%Y-%m-%d %H:%M"`
+
+# no arguments: stamp "start"
+if [ $# = 0 ]; then
+    echo $datetime start >> $STAMPFILE
+else
+    echo $datetime $@ >> $STAMPFILE
+fi
