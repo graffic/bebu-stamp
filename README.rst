@@ -31,7 +31,7 @@ To get reports use the ``days_calc`` tool.
    00:12 myclient I did this and that
    myclient: 00:12
    ---------------------------------------------
-   restart totals: umberto: 00:12
+   restart totals: myclient: 00:12
 
 Advanced usage
 --------------
