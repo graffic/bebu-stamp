@@ -40,6 +40,8 @@ Data is written to a text file. By default it uses ``~/.workstamps.txt``. You
 can divide the work stamps file into reports by inserting the ``restarttotals``
 keyword.
 
+.. code-block:: bash
+
     2013-11-08 11:00 start
     2013-11-08 11:12 myclient I did this and that
     ...
