@@ -103,13 +103,13 @@ class TestItemify(object):
     def test_iter(self):
         m = mock_open()
         m.return_value.__iter__.return_value = ['  ', '2001-02-03 15:34 start']
-        with patch('days.open', m, create=True):
+        with patch('days_calc.open', m, create=True):
             result = list(Itemify(''))
         assert [Start(1, '2001-02-03 15:34')] == result
 
     def test_open_right_file(self):
         m = mock_open()
-        with patch('days.open', m, create=True) as popen:
+        with patch('days_calc.open', m, create=True) as popen:
             result = list(Itemify('filename'))
         popen.assert_called_with('filename', 'r')
 
