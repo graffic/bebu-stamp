@@ -107,11 +107,11 @@ def item_factory(lineno, line):
 ##############################################################################
 class WorkItem(object):
     """Stores work item data using line items"""
-    def __init__(self, start, item):
+    def __init__(self, start, line):
         self.start = start
-        self.end = item.when
-        self.customer = item.customer
-        self.description = item.description
+        self.end = line.when
+        self.customer = line.customer
+        self.description = line.description
 
     @property
     def duration(self):
@@ -122,6 +122,12 @@ class WorkItem(object):
     def date(self):
         """Work date based on the end date"""
         return self.end.date()
+
+    def __eq__(self, other):
+        return other.start == self.start and \
+            other.end == self.end and \
+            other.customer == self.customer and \
+            other.description == self.description
 
 
 def initial_state(context, item):
@@ -136,8 +142,7 @@ def expect_work(context, item):
     """Expecting work items state"""
     if not item.is_work:
         raise RuntimeError('start must be followed by some activity', item)
-    context.add_item(WorkItem(context.start_period, item))
-    context.start_period = item.when
+    context.add_item(item)
     return working
 
 
@@ -150,7 +155,7 @@ def working(context, item):
     elif item.is_restart:
         context.add_current_report()
         return initial_state
-    assert False, 'This shouldnt happen %s' % item
+    raise RuntimeError('This shouldnt happen %s' % item)
 
 
 class WorkstampsParser(object):
@@ -173,9 +178,11 @@ class WorkstampsParser(object):
             self.add_current_report()
         return self.__reports
 
-    def add_item(self, item):
+    def add_item(self, line_item):
         """Adds a processed work item"""
+        item = WorkItem(self.start_period, line_item)
         self.__stack.append(item)
+        self.start_period = item.end
 
     def add_current_report(self):
         """Adds the current work items as a group and start a new work item

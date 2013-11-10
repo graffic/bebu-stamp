@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta, date
 
-from mock import mock_open, patch
+from mock import mock_open, patch, Mock
 import pytest
 
 from days_calc import (
@@ -9,7 +9,13 @@ from days_calc import (
     Start,
     Work,
     Itemify,
-    item_factory)
+    item_factory,
+    WorkItem,
+    initial_state,
+    expect_work,
+    working,
+    WorkstampsParser,
+    filter_report)
 
 
 @pytest.mark.parametrize(('attr', 'value'), [
@@ -126,3 +132,169 @@ class TestItemFactory(object):
         res = item_factory(12, '2001-02-03 15:34 customer my descrip tion')
         expected = Work(12, '2001-02-03 15:34', 'customer', 'my descrip tion')
         assert expected == res
+
+
+@pytest.fixture
+def work_line():
+    return Work(12, '2001-01-03 04:15', 'cst', 'dsc')
+
+
+@pytest.fixture
+def start_line():
+    return Start(11, '2001-01-02 03:00')
+
+
+@pytest.fixture
+def restart_line():
+    return RestartTotals(13)
+
+
+class TestWorkItem(object):
+    @pytest.fixture
+    def sut(self, work_line):
+        return WorkItem(datetime(2001, 1, 2, 3, 0, 0), work_line)
+
+    @pytest.mark.parametrize(('attr', 'expected'), [
+        ('start', datetime(2001, 1, 2, 3, 0, 0)),
+        ('end', datetime(2001, 1, 3, 4, 15, 0)),
+        ('customer', 'cst'),
+        ('description', 'dsc'),
+        ('duration', timedelta(1, 3600 + (60 * 15))),
+        ('date', date(2001, 1, 3))])
+    def test_init(self, attr, expected, sut):
+        assert expected == getattr(sut, attr)
+
+    @pytest.mark.parametrize(('other', 'expected'), [
+        (WorkItem(datetime(2001, 1, 2, 3), work_line()), True),
+        (WorkItem('other', work_line()), False),
+        (WorkItem(datetime(2001, 1, 2, 3),
+         Work(12, '9999-01-03 04:15', 'cst', 'dsc')), False),
+        (WorkItem(datetime(2001, 1, 2, 3),
+         Work(12, '2001-01-03 04:15', 'lol', 'dsc')), False),
+        (WorkItem(datetime(2001, 1, 2, 3),
+         Work(12, '2001-01-03 04:15', 'cst', 'lol')), False)])
+    def test_eq(self, sut, other, expected):
+        assert expected == (sut == other)
+
+
+class TestInitialState(object):
+    def test_no_start_line(self, work_line):
+        with pytest.raises(RuntimeError):
+            initial_state('context', work_line)
+
+    def test_start_period(self, start_line):
+        context = Mock()
+        initial_state(context, start_line)
+        assert start_line.when == context.start_period
+
+    def test_next_state(self, start_line):
+        assert expect_work is initial_state(Mock(), start_line)
+
+
+class TestExpectWork(object):
+    def test_no_work_line(self, start_line):
+        with pytest.raises(RuntimeError):
+            expect_work('context', start_line)
+
+    def test_add_item(self, work_line):
+        context = Mock()
+        expect_work(context, work_line)
+        context.add_item.assert_called_with(work_line)
+
+    def test_next_state(self, work_line):
+        assert working is expect_work(Mock(), work_line)
+
+
+class TestWorking(object):
+    def test_start_next(self, start_line):
+        assert expect_work is working(Mock(), start_line)
+
+    def test_start_change_period(self, start_line):
+        context = Mock()
+        working(context, start_line)
+        assert start_line.when == context.start_period
+
+    def test_work_next(self, work_line):
+        assert working is working(Mock(), work_line)
+
+    def test_work_add_item(self, work_line):
+        context = Mock()
+        working(context, work_line)
+        context.add_item.assert_called_with(work_line)
+
+    def test_restart_next(self, restart_line):
+        assert initial_state is working(Mock(), restart_line)
+
+    def test_restart_report(self, restart_line):
+        context = Mock()
+        working(context, restart_line)
+        context.add_current_report.assert_called_with()
+
+    def test_error(self):
+        with pytest.raises(RuntimeError):
+            working('context', Item(12))
+
+
+class TestWorkstampsParser(object):
+    def build_sut(self, items):
+        with patch('days_calc.Itemify') as pitemify:
+            pitemify.return_value = items
+            return WorkstampsParser('filename')
+
+    @pytest.fixture
+    def sut(self):
+        return self.build_sut([])
+
+    @pytest.fixture
+    def items(self):
+        return [
+            Start(12, '2001-01-01 00:00'),
+            Work(13, '2001-01-01 01:00', 'mycust', 'mydesc'),
+            RestartTotals(14),
+            Start(15, '2001-01-02 00:00'),
+            Work(16, '2001-01-02 01:00', 'mycust', 'mydesc')]
+
+    def test_init_start_period(self, sut):
+        assert sut.start_period is None
+
+    def test_init_build_itemify(self):
+        with patch('days_calc.Itemify') as pitemify:
+            WorkstampsParser('file.txt')
+        pitemify.assert_called_with('file.txt')
+
+    def test_add_item(self, sut, work_line):
+        sut.add_item(work_line)
+
+        sut.add_current_report()
+        assert [[WorkItem(None, work_line)]] == sut.parse()
+
+    def test_add_item_update_start(self, sut, work_line):
+        sut.add_item(work_line)
+        assert sut.start_period == work_line.when
+
+    def test_add_current_report(self, sut):
+        sut.add_current_report()
+        assert [[]] == sut.parse()
+
+    def test_add_current_report_start(self, sut):
+        sut.start_period = 'banana'
+        sut.add_current_report()
+        assert sut.start_period is None
+
+    def test_parse(self, items):
+        sut = self.build_sut(items)
+        res = sut.parse()
+        expected = [
+            [WorkItem(datetime(2001, 1, 1),
+             Work(13, '2001-01-01 01:00', 'mycust', 'mydesc'))],
+            [WorkItem(datetime(2001, 1, 2),
+             Work(16, '2001-01-02 01:00', 'mycust', 'mydesc'))]]
+        assert expected == res
+
+
+class TestFilterReport(object):
+    def test_none(self):
+        assert 'items' == filter_report(None, 'items')
+
+    def test_report(self):
+        assert (3,) == filter_report(1, [1, 2, 3])
