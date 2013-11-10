@@ -3,6 +3,8 @@ Bebu Time tracker
 
 Simple shell time tracker. Based on `betabug`_ `stamp`_ time tracker.
 
+The functionality might be dummy, but it's also a testing and patterns excercise.
+
 Usage
 -----
 
