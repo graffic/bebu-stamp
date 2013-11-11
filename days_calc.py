@@ -294,11 +294,12 @@ class WorkReport(list):
 ##############################################################################
 def format_timestamp(delta):
     """Formats a timedelta in Hours:minutes string"""
-    hours, seconds = divmod(delta.seconds, 3600)
-    minutes, seconds = divmod(seconds, 60)
-    assert seconds == 0
+    hours, remaining_seconds = divmod(delta.seconds, 3600)
+    minutes = remaining_seconds / 60
+    # We always measure entire minutes
+    assert remaining_seconds % 60 == 0
     hours = hours + delta.days * 24
-    return '{0:0>2}:{1:0>2}'.format(hours, minutes)
+    return '%d:%02d' % (hours, minutes)
 
 
 class TextReport(object):
