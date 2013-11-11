@@ -164,25 +164,21 @@ def working(context, item):
     raise RuntimeError('This shouldnt happen %s' % item)
 
 
-class WorkstampsParser(object):
-    """Parses the ``workstamps`` file"""
-    def __init__(self, filename):
-        self.__items = Itemify(filename)
+class ParserContext(object):
+    """Holds parsing context during parsing"""
+    def __init__(self):
         self.__stack = []
         self.__reports = []
         self.start_period = None
 
-    def parse(self):
-        """
-        Parsing the file returns a list of lists. Each sublist contains
-        WorkItems inside a restarttotal block/report
-        """
-        state = initial_state
-        for item in self.__items:
-            state = state(self, item)
-        if self.__stack != []:
-            self.add_current_report()
-        return self.__reports
+    def add_current_report(self):
+        """Adds the current work items as a group and start a new work item
+        list"""
+        if not self.__stack:
+            return
+        self.__reports.append(self.__stack)
+        self.__stack = []
+        self.start_period = None
 
     def add_item(self, line_item):
         """Adds a processed work item"""
@@ -190,12 +186,23 @@ class WorkstampsParser(object):
         self.__stack.append(item)
         self.start_period = item.end
 
-    def add_current_report(self):
-        """Adds the current work items as a group and start a new work item
-        list"""
-        self.__reports.append(self.__stack)
-        self.__stack = []
-        self.start_period = None
+    @property
+    def reports(self):
+        """Reports stored during parsing"""
+        return self.__reports
+
+
+def parse_workstamps(filename):
+    """
+    Parsing the file returns a list of lists. Each sublist contains
+    WorkItems inside a restarttotal block/report
+    """
+    state = initial_state
+    context = ParserContext()
+    for item in Itemify(filename):
+        state = state(context, item)
+    context.add_current_report()
+    return context.reports
 
 
 ##############################################################################
@@ -378,8 +385,8 @@ def run_from_command_line():
         stats_by_day(
             filter_customer(
                 args.customer, filter_report(
-                    args.week, WorkstampsParser(
-                        args.file).parse())))).text
+                    args.week, parse_workstamps(
+                        args.file))))).text
 
 
 if __name__ == '__main__':

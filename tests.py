@@ -14,7 +14,8 @@ from days_calc import (
     initial_state,
     expect_work,
     working,
-    WorkstampsParser,
+    ParserContext,
+    parse_workstamps,
     filter_report)
 
 
@@ -235,15 +236,40 @@ class TestWorking(object):
             working('context', Item(12))
 
 
-class TestWorkstampsParser(object):
-    def build_sut(self, items):
-        with patch('days_calc.Itemify') as pitemify:
-            pitemify.return_value = items
-            return WorkstampsParser('filename')
-
+class TestParserContext(object):
     @pytest.fixture
     def sut(self):
-        return self.build_sut([])
+        return ParserContext()
+
+    def test_init_start_period(self, sut):
+        assert sut.start_period is None
+
+    def test_add_item(self, sut, work_line):
+        sut.add_item(work_line)
+
+        sut.add_current_report()
+        assert [[WorkItem(None, work_line)]] == sut.reports
+
+    def test_add_item_update_start(self, sut, work_line):
+        sut.add_item(work_line)
+        assert sut.start_period == work_line.when
+
+    def test_add_current_report_empty(self, sut):
+        sut.add_current_report()
+        assert [] == sut.reports
+
+    def test_add_current_report_start(self, sut, work_line):
+        sut.start_period = 'banana'
+        sut.add_item(work_line)
+        sut.add_current_report()
+        assert sut.start_period is None
+
+
+class TestParseWorkstamps(object):
+    def call_sut(self, items):
+        with patch('days_calc.Itemify') as pitemify:
+            pitemify.return_value = items
+            return parse_workstamps('filename'), pitemify
 
     @pytest.fixture
     def items(self):
@@ -254,36 +280,12 @@ class TestWorkstampsParser(object):
             Start(15, '2001-01-02 00:00'),
             Work(16, '2001-01-02 01:00', 'mycust', 'mydesc')]
 
-    def test_init_start_period(self, sut):
-        assert sut.start_period is None
-
-    def test_init_build_itemify(self):
-        with patch('days_calc.Itemify') as pitemify:
-            WorkstampsParser('file.txt')
-        pitemify.assert_called_with('file.txt')
-
-    def test_add_item(self, sut, work_line):
-        sut.add_item(work_line)
-
-        sut.add_current_report()
-        assert [[WorkItem(None, work_line)]] == sut.parse()
-
-    def test_add_item_update_start(self, sut, work_line):
-        sut.add_item(work_line)
-        assert sut.start_period == work_line.when
-
-    def test_add_current_report(self, sut):
-        sut.add_current_report()
-        assert [[]] == sut.parse()
-
-    def test_add_current_report_start(self, sut):
-        sut.start_period = 'banana'
-        sut.add_current_report()
-        assert sut.start_period is None
+    def test_build_itemify(self):
+        res, pitemify = self.call_sut([])
+        pitemify.assert_called_with('filename')
 
     def test_parse(self, items):
-        sut = self.build_sut(items)
-        res = sut.parse()
+        res = self.call_sut(items)[0]
         expected = [
             [WorkItem(datetime(2001, 1, 1),
              Work(13, '2001-01-01 01:00', 'mycust', 'mydesc'))],
