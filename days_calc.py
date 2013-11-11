@@ -370,10 +370,10 @@ def cmdline_arguments():
         'week', type=int, default=None, nargs='?',
         help='Report a specific week (default: all weeks)')
     parser.add_argument(
-        '--customer', '-c', nargs=1,
+        '--customer', '-c',
         help='report for a customer (default: all customers)')
     parser.add_argument(
-        '--file', '-f', nargs=1, default=expanduser('~/.workstamps.txt'),
+        '--file', '-f', default=expanduser('~/.workstamps.txt'),
         help='Input filename (default: ~/.workstamps.txt)')
     return parser.parse_args()
 
