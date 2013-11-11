@@ -8,7 +8,7 @@ from days_calc import (
     RestartTotals,
     Start,
     Work,
-    Itemify,
+    itemify,
     item_factory,
     WorkItem,
     initial_state,
@@ -16,7 +16,11 @@ from days_calc import (
     working,
     ParserContext,
     parse_workstamps,
-    filter_report)
+    filter_report,
+    filter_customer,
+    stats_by_day,
+    WorkDay,
+    WorkReport)
 
 
 @pytest.mark.parametrize(('attr', 'value'), [
@@ -111,13 +115,13 @@ class TestItemify(object):
         m = mock_open()
         m.return_value.__iter__.return_value = ['  ', '2001-02-03 15:34 start']
         with patch('days_calc.open', m, create=True):
-            result = list(Itemify(''))
+            result = list(itemify(''))
         assert [Start(1, '2001-02-03 15:34')] == result
 
     def test_open_right_file(self):
         m = mock_open()
         with patch('days_calc.open', m, create=True) as popen:
-            result = list(Itemify('filename'))
+            result = list(itemify('filename'))
         popen.assert_called_with('filename', 'r')
 
 
@@ -265,9 +269,18 @@ class TestParserContext(object):
         assert sut.start_period is None
 
 
+@pytest.fixture
+def work_items():
+    return [
+        WorkItem(datetime(2001, 1, 1),
+                 Work(13, '2001-01-01 01:00', 'mycust', 'mydesc')),
+        WorkItem(datetime(2001, 1, 2),
+                 Work(16, '2001-01-02 01:00', 'mycust', 'mydesc'))]
+
+
 class TestParseWorkstamps(object):
     def call_sut(self, items):
-        with patch('days_calc.Itemify') as pitemify:
+        with patch('days_calc.itemify') as pitemify:
             pitemify.return_value = items
             return parse_workstamps('filename'), pitemify
 
@@ -284,13 +297,9 @@ class TestParseWorkstamps(object):
         res, pitemify = self.call_sut([])
         pitemify.assert_called_with('filename')
 
-    def test_parse(self, items):
+    def test_parse(self, items, work_items):
         res = self.call_sut(items)[0]
-        expected = [
-            [WorkItem(datetime(2001, 1, 1),
-             Work(13, '2001-01-01 01:00', 'mycust', 'mydesc'))],
-            [WorkItem(datetime(2001, 1, 2),
-             Work(16, '2001-01-02 01:00', 'mycust', 'mydesc'))]]
+        expected = [[work_items[0]], [work_items[1]]]
         assert expected == res
 
 
@@ -300,3 +309,41 @@ class TestFilterReport(object):
 
     def test_report(self):
         assert (3,) == filter_report(1, [1, 2, 3])
+
+
+class TestFilterCustomer(object):
+    def test_none(self):
+        assert 'items' == filter_customer(None, 'items')
+
+    def test_filter(self):
+        myitem = Mock(customer='a')
+        items = [
+            [myitem, Mock(customer='b')],
+            [Mock(customer='b'), Mock(customer='b')]]
+        assert [[myitem]] == filter_customer('a', items)
+
+
+class TestStatsByDay(object):
+    @pytest.fixture
+    def items(self, work_items):
+        return [work_items]
+
+    def test_grouping(self, items):
+        assert [[[items[0][0]], [items[0][1]]]] == stats_by_day(items)
+
+    def test_day_stats(self, items):
+        assert isinstance(stats_by_day(items)[0][0], WorkDay)
+
+    def test_report_stats(self, items):
+        assert isinstance(stats_by_day(items)[0], WorkReport)
+
+
+class TestWorkDay(object):
+    def test_items(self, work_items):
+        assert work_items == list(WorkDay(work_items))
+
+    def test_customer_day_totals(self, work_items):
+        assert {'mycust': timedelta(0, 7200)} == WorkDay(work_items).customers
+
+    def test_date(self, work_items):
+        assert work_items[0].date == WorkDay(work_items).date

@@ -81,30 +81,26 @@ class Work(Start):
             super(Work, self).__eq__(other)
 
 
-class Itemify(object):
+def itemify(filename):
     """Split a .workstamp file into items"""
-    def __init__(self, filename):
-        self.__filename = filename
-
-    def __iter__(self):
-        with open(self.__filename, 'r') as infile:
-            lineno = 0
-            for line in infile:
-                line = line.strip()
-                if line:
-                    yield item_factory(lineno, line)
-                lineno += 1
+    with open(filename, 'r') as infile:
+        lineno = 0
+        for line in infile:
+            line = line.strip()
+            if line:
+                yield item_factory(lineno, line)
+            lineno += 1
 
 
 def item_factory(lineno, line):
     """Build the right item from a .workstamp line"""
     if line == 'restarttotals':
         return RestartTotals(lineno)
-    elements = line.split(' ', 3)
     date_time = line[:16]
-    if len(elements) == 3 and elements[2] == 'start':
+    info = line[17:]
+    if info == 'start':
         return Start(lineno, date_time)
-    return Work(lineno, date_time, *elements[2:])
+    return Work(lineno, date_time, *info.split(' ', 1))
 
 
 ##############################################################################
@@ -199,7 +195,7 @@ def parse_workstamps(filename):
     """
     state = initial_state
     context = ParserContext()
-    for item in Itemify(filename):
+    for item in itemify(filename):
         state = state(context, item)
     context.add_current_report()
     return context.reports
@@ -228,7 +224,7 @@ def filter_customer(customer, items):
     new_items = []
     for group in items:
         newgroup = [wp for wp in group if wp.customer == customer]
-        if newgroup == []:
+        if not newgroup:
             continue
         new_items.append(newgroup)
     return new_items
@@ -243,33 +239,32 @@ def stats_by_day(items):
         previous = group[0].date
         new_group = []
         for item in group:
-            if previous != item.date and day != []:
+            if previous != item.date and day:
                 new_group.append(WorkDay(day))
                 previous = item.date
                 day = []
             day.append(item)
-        if day != []:
+        if day:
             new_group.append(WorkDay(day))
         new_items.append(WorkReport(new_group))
     return new_items
-
-
-def customer_day_totals(items):
-    """Builds customer totals for a day items"""
-    totals = {}
-    for item in items:
-        if item.customer not in totals:
-            totals[item.customer] = item.duration
-            continue
-        totals[item.customer] += item.duration
-    return totals
 
 
 class WorkDay(list):
     """Wraps a group of days with statistics"""
     def __init__(self, items):
         super(WorkDay, self).__init__(items)
-        self.customers = customer_day_totals(items)
+        self.customers = self.__totals()
+
+    def __totals(self):
+        """Builds customer totals for a day items"""
+        totals = {}
+        for item in self:
+            if item.customer not in totals:
+                totals[item.customer] = item.duration
+                continue
+            totals[item.customer] += item.duration
+        return totals
 
     @property
     def date(self):
@@ -277,23 +272,22 @@ class WorkDay(list):
         return self[0].date
 
 
-def customer_report_totals(days):
-    """Builds customer totals for many days in a report"""
-    totals = {}
-    for day in days:
-        for customer, total in day.customers.iteritems():
-            if customer not in totals:
-                totals[customer] = total
-                continue
-            totals[customer] += total
-    return totals
-
-
 class WorkReport(list):
     """Group of days (restarttotals) providing customer statistics"""
     def __init__(self, days):
         super(WorkReport, self).__init__(days)
-        self.customers = customer_report_totals(days)
+        self.customers = self.__totals()
+
+    def __totals(self):
+        """Builds customer totals for many days in a report"""
+        totals = {}
+        for day in self:
+            for customer, total in day.customers.iteritems():
+                if customer not in totals:
+                    totals[customer] = total
+                    continue
+                totals[customer] += total
+        return totals
 
 
 ##############################################################################

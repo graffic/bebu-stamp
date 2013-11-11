@@ -15,8 +15,7 @@ about:
 
     141480 function calls (141366 primitive calls) in 1.068 seconds
     vs
-    49423 function calls (49389 primitive calls) in 0.302 seconds
-
+    46054 function calls (46016 primitive calls) in 0.284 seconds
 
 Usage
 -----
