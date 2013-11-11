@@ -42,7 +42,13 @@ class Start(Item):
 
     def __init__(self, lineno, date_time):
         super(Start, self).__init__(lineno)
-        self.when = datetime.strptime(date_time, '%Y-%m-%d %H:%M')
+        # Known format: year-month-day hour:minutes
+        self.when = datetime(
+            int(date_time[:4]),
+            int(date_time[5:7]),
+            int(date_time[8:10]),
+            int(date_time[11:13]),
+            int(date_time[14:16]))
 
     def __repr__(self):
         """Debugging helper representation"""
