@@ -2,6 +2,7 @@
 """
 .workstamps report formatter
 """
+from __future__ import print_function
 from argparse import ArgumentParser
 from datetime import datetime
 from os.path import expanduser
@@ -282,7 +283,7 @@ class WorkReport(list):
         """Builds customer totals for many days in a report"""
         totals = {}
         for day in self:
-            for customer, total in day.customers.iteritems():
+            for customer, total in day.customers.items():
                 if customer not in totals:
                     totals[customer] = total
                     continue
@@ -351,7 +352,7 @@ class TextReport(object):
             """Formats a customer and its time totals"""
             totals = format_timestamp(totals)
             return '%s%s: %s' % (prefix, customer, totals)
-        self.__lines.extend([fmt(c, t) for c, t in customers.iteritems()])
+        self.__lines.extend([fmt(c, t) for c, t in customers.items()])
 
 
 ##############################################################################
@@ -375,12 +376,12 @@ def cmdline_arguments():
 def run_from_command_line():
     """Run the report with command line arguments"""
     args = cmdline_arguments()
-    print TextReport(
+    print(TextReport(
         stats_by_day(
             filter_customer(
                 args.customer, filter_report(
                     args.week, parse_workstamps(
-                        args.file))))).text
+                        args.file))))).text)
 
 
 if __name__ == '__main__':
