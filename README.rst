@@ -3,7 +3,20 @@ Bebu Time tracker
 
 Simple shell time tracker. Based on `betabug`_ `stamp`_ time tracker.
 
-The functionality might be dummy, but it's also a testing and patterns excercise.
+The functionality might be dummy, but this clone was created as an exercise
+about:
+
+- Code simplicity
+- Testability
+- Features
+- Implications of the above in performance
+
+.. code-block::
+
+    141480 function calls (141366 primitive calls) in 1.068 seconds
+    vs
+    49423 function calls (49389 primitive calls) in 0.302 seconds
+
 
 Usage
 -----
