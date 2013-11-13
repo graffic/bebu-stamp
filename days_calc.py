@@ -215,7 +215,7 @@ def filter_report(report, items):
     """
     if report is None:
         return items
-    return (items[-1 * report],)
+    return (items[-1 * (report + 1)],)
 
 
 def filter_customer(customer, items):

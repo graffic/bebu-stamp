@@ -308,7 +308,7 @@ class TestFilterReport(object):
         assert 'items' == filter_report(None, 'items')
 
     def test_report(self):
-        assert (3,) == filter_report(1, [1, 2, 3])
+        assert (3,) == filter_report(0, [1, 2, 3])
 
 
 class TestFilterCustomer(object):
