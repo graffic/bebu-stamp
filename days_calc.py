@@ -294,7 +294,7 @@ class WorkReport(list):
 ##############################################################################
 # Output in text. Build report lines and format timedeltas
 ##############################################################################
-def format_timestamp(delta):
+def format_timedelta(delta):
     """Formats a timedelta in Hours:minutes string"""
     hours, remaining_seconds = divmod(delta.seconds, 3600)
     minutes = remaining_seconds / 60
@@ -335,7 +335,7 @@ class TextReport(object):
 
         def item_format(work):
             """format a work item into a string"""
-            duration = format_timestamp(work.duration)
+            duration = format_timedelta(work.duration)
             return '%s %s %s' % (duration, work.customer, work.description)
         self.__lines.extend([item_format(wp) for wp in day])
         self.__customer(day.customers)
@@ -350,7 +350,7 @@ class TextReport(object):
         """Add lines for totals"""
         def fmt(customer, totals):
             """Formats a customer and its time totals"""
-            totals = format_timestamp(totals)
+            totals = format_timedelta(totals)
             return '%s%s: %s' % (prefix, customer, totals)
         self.__lines.extend([fmt(c, t) for c, t in customers.items()])
 

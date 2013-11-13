@@ -20,7 +20,8 @@ from days_calc import (
     filter_customer,
     stats_by_day,
     WorkDay,
-    WorkReport)
+    WorkReport,
+    format_timedelta)
 
 
 @pytest.mark.parametrize(('attr', 'value'), [
@@ -347,3 +348,28 @@ class TestWorkDay(object):
 
     def test_date(self, work_items):
         assert work_items[0].date == WorkDay(work_items).date
+
+
+class TestWorkReport(object):
+    @pytest.fixture
+    def work_days(self, work_items):
+        return [WorkDay(work_items), WorkDay(work_items)]
+
+    @pytest.fixture
+    def sut(self, work_days):
+        return WorkReport(work_days)
+
+    def test_items(self, sut, work_days):
+        assert work_days == list(sut)
+
+    def test_totals(self, sut):
+        assert {'mycust': timedelta(0, 14400)} == sut.customers
+
+
+class TestFormatTimestamp(object):
+    def test_format(self):
+        assert '240:05' == format_timedelta(timedelta(10, 300))
+
+    def test_withseconds(self):
+        with pytest.raises(AssertionError):
+            format_timedelta(timedelta(0, 1))
