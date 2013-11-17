@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, date
+import sys
 
 from mock import mock_open, patch, Mock
 import pytest
@@ -21,7 +22,12 @@ from days_calc import (
     stats_by_day,
     WorkDay,
     WorkReport,
-    format_timedelta)
+    format_timedelta,
+    customer_totals,
+    customer_summary,
+    day_report,
+    TextReport,
+    cmdline_arguments)
 
 
 @pytest.mark.parametrize(('attr', 'value'), [
@@ -339,31 +345,33 @@ class TestStatsByDay(object):
         assert isinstance(stats_by_day(items)[0], WorkReport)
 
 
+@pytest.fixture
+def work_day(work_items):
+    return WorkDay(work_items)
+
+
 class TestWorkDay(object):
-    def test_items(self, work_items):
-        assert work_items == list(WorkDay(work_items))
+    def test_items(self, work_items, work_day):
+        assert work_items == list(work_day)
 
-    def test_customer_day_totals(self, work_items):
-        assert {'mycust': timedelta(0, 7200)} == WorkDay(work_items).customers
+    def test_customer_day_totals(self, work_day):
+        assert {'mycust': timedelta(0, 7200)} == work_day.customers
 
-    def test_date(self, work_items):
-        assert work_items[0].date == WorkDay(work_items).date
+    def test_date(self, work_day, work_items):
+        assert work_items[0].date == work_day.date
+
+
+@pytest.fixture
+def work_report(work_day):
+    return WorkReport([work_day, work_day])
 
 
 class TestWorkReport(object):
-    @pytest.fixture
-    def work_days(self, work_items):
-        return [WorkDay(work_items), WorkDay(work_items)]
+    def test_items(self, work_report, work_day):
+        assert [work_day, work_day] == list(work_report)
 
-    @pytest.fixture
-    def sut(self, work_days):
-        return WorkReport(work_days)
-
-    def test_items(self, sut, work_days):
-        assert work_days == list(sut)
-
-    def test_totals(self, sut):
-        assert {'mycust': timedelta(0, 14400)} == sut.customers
+    def test_totals(self, work_report):
+        assert {'mycust': timedelta(0, 14400)} == work_report.customers
 
 
 class TestFormatTimestamp(object):
@@ -373,3 +381,92 @@ class TestFormatTimestamp(object):
     def test_withseconds(self):
         with pytest.raises(AssertionError):
             format_timedelta(timedelta(0, 1))
+
+
+class TestCustomerTotals(object):
+    def test_no_prefix(self):
+        res = customer_totals({'c1': timedelta(1)})
+        assert ['c1: 24:00'] == res
+
+    def test_prefix(self):
+        res = customer_totals({'c1': timedelta(1)}, 'hey: ')
+        assert ['hey: c1: 24:00'] == res
+
+
+def test_report_summary():
+    res = customer_summary({'mycust': timedelta(0, 7200)})
+    expected = [
+        '---------------------------------------------',
+        'restart totals: mycust: 2:00', '']
+    assert expected == res
+
+
+def test_day_report(work_day):
+    res = day_report(work_day)
+    expected = [
+        '---------- 2001-01-01 ----------',
+        '1:00 mycust mydesc',
+        '1:00 mycust mydesc',
+        'mycust: 2:00']
+    assert res == expected
+
+
+class TestTextReport(object):
+    @pytest.fixture
+    def sut(self, work_report):
+        return TextReport([work_report])
+
+    def test_lines(self, sut):
+        lines = [
+            '---------- 2001-01-01 ----------', '1:00 mycust mydesc',
+            '1:00 mycust mydesc', 'mycust: 2:00',
+            '---------- 2001-01-01 ----------', '1:00 mycust mydesc',
+            '1:00 mycust mydesc', 'mycust: 2:00',
+            '---------------------------------------------',
+            'restart totals: mycust: 4:00', '']
+        # 4 = 1 + 2 + 1 lines day summary x 2, 3 lines for report summary
+        assert sut.lines
+
+    def test_text(self, sut):
+        text = """---------- 2001-01-01 ----------
+1:00 mycust mydesc
+1:00 mycust mydesc
+mycust: 2:00
+---------- 2001-01-01 ----------
+1:00 mycust mydesc
+1:00 mycust mydesc
+mycust: 2:00
+---------------------------------------------
+restart totals: mycust: 4:00
+"""
+        assert text == sut.text
+
+
+class TestCmdlineArguments(object):
+    def run_sut(self, arguments):
+        args = ['basename'] + arguments
+        with patch.object(sys, 'argv', args),\
+                patch('days_calc.expanduser') as pexpand:
+            pexpand.return_value = 'user_folder!'
+            return cmdline_arguments()
+
+    def test_empty(self):
+        args = self.run_sut([])
+        expected = dict(
+            customer=None, file='user_folder!', week=None)
+        assert expected == vars(args)
+
+    def test_week(self):
+        args = self.run_sut(['2'])
+        expected = dict(customer=None, file='user_folder!', week=2)
+        assert expected == vars(args)
+
+    def test_customer(self):
+        args = self.run_sut(['--customer', 'cust'])
+        expected = dict(customer='cust', file='user_folder!', week=None)
+        assert expected == vars(args)
+
+    def test_file(self):
+        args = self.run_sut(['--file', 'myfile'])
+        expected = dict(customer=None, file='myfile', week=None)
+        assert expected == vars(args)

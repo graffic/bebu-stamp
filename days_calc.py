@@ -304,6 +304,36 @@ def format_timedelta(delta):
     return '%d:%02d' % (hours, minutes)
 
 
+def customer_totals(customers, prefix=''):
+    """Text lines for customer totals"""
+    def fmt(customer, totals):
+        """Formats a customer and its time totals"""
+        totals = format_timedelta(totals)
+        return '%s%s: %s' % (prefix, customer, totals)
+    return [fmt(c, t) for c, t in customers.items()]
+
+
+def customer_summary(customers):
+    """Text summary lines for customer totals in a day"""
+    summary = ['---------------------------------------------']
+    summary.extend(customer_totals(customers, 'restart totals: '))
+    summary.append('')
+    return summary
+
+
+def day_report(day):
+    """Adds lines for a day report"""
+    report = ['---------- %s ----------' % day.date]
+
+    def item_format(work):
+        """format a work item into a string"""
+        duration = format_timedelta(work.duration)
+        return '%s %s %s' % (duration, work.customer, work.description)
+    report.extend([item_format(wp) for wp in day])
+    report.extend(customer_totals(day.customers))
+    return report
+
+
 class TextReport(object):
     """Text report from stats per day data"""
     def __init__(self, report_data):
@@ -319,8 +349,8 @@ class TextReport(object):
         self.__lines = []
         for report in self.report_data:
             for day in report:
-                self.__build_day(day)
-            self.__summary(report)
+                self.__lines.extend(day_report(day))
+            self.__lines.extend(customer_summary(report.customers))
 
         return self.__lines
 
@@ -328,31 +358,6 @@ class TextReport(object):
     def text(self):
         """Get the report as one string"""
         return '\n'.join(self.lines)
-
-    def __build_day(self, day):
-        """Adds lines for a day report"""
-        self.__lines.append("---------- %s ----------" % day.date)
-
-        def item_format(work):
-            """format a work item into a string"""
-            duration = format_timedelta(work.duration)
-            return '%s %s %s' % (duration, work.customer, work.description)
-        self.__lines.extend([item_format(wp) for wp in day])
-        self.__customer(day.customers)
-
-    def __summary(self, report):
-        """adds summary lines for customer totals in a day"""
-        self.__lines.append('---------------------------------------------')
-        self.__customer(report.customers, 'restart totals: ')
-        self.__lines.append('')
-
-    def __customer(self, customers, prefix=''):
-        """Add lines for totals"""
-        def fmt(customer, totals):
-            """Formats a customer and its time totals"""
-            totals = format_timedelta(totals)
-            return '%s%s: %s' % (prefix, customer, totals)
-        self.__lines.extend([fmt(c, t) for c, t in customers.items()])
 
 
 ##############################################################################
